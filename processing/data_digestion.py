@@ -1,0 +1,65 @@
+import os
+import re
+import zipfile
+import io
+import numpy as np
+import pandas as pd
+
+def digest_csv_archive(uploaded_zip, progress_callback=None):
+    """
+    Data Digestion Pipeline
+    Handles the parsing, naming validation, and Fortran-order grid alignment 
+    of physical spatial coordinates and velocity vector fields from DaVis 11 CSV files.
+    """
+    frames_list = []
+    
+    with zipfile.ZipFile(uploaded_zip) as z:
+        all_files = [f for f in z.namelist() if f.endswith('.csv') and not f.startswith('__MACOSX')]
+        all_files = sorted(
+            all_files, 
+            key=lambda x: [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', os.path.basename(x))]
+        )
+        
+        num_files = len(all_files)
+        
+        for i, filename in enumerate(all_files):
+            if progress_callback:
+                progress_callback(i, num_files, os.path.basename(filename))
+                
+            with z.open(filename) as f:
+                df = pd.read_csv(f, sep=';')
+                df.columns = df.columns.str.strip()
+                
+                X = df['x [mm]'].to_numpy()
+                Y = df['y [mm]'].to_numpy()
+                U = df['Velocity u [m/s]'].to_numpy()
+                V = df['Velocity v [m/s]'].to_numpy()
+                Vmag = df['Velocity |V| [m/s]'].to_numpy()
+                vort = df['Vorticity w_z (dv/dx - du/dy) [1/s]'].to_numpy()
+                
+                xu = np.unique(X)
+                yu = np.unique(Y)
+                nx = len(xu)
+                ny = len(yu)
+                expected_grid_size = nx * ny
+                
+                if len(X) > expected_grid_size:
+                    X = X[:expected_grid_size]
+                    Y = Y[:expected_grid_size]
+                    U = U[:expected_grid_size]
+                    V = V[:expected_grid_size]
+                    Vmag = Vmag[:expected_grid_size]
+                    vort = vort[:expected_grid_size]
+                
+                # Reshaping matrices requires Fortran order to preserve spatial orientation
+                frame_dict = {
+                    "X": X.reshape((ny, nx), order='F'),
+                    "Y": Y.reshape((ny, nx), order='F'),
+                    "U": U.reshape((ny, nx), order='F'),
+                    "V": V.reshape((ny, nx), order='F'),
+                    "Vmag": Vmag.reshape((ny, nx), order='F'),
+                    "vort": vort.reshape((ny, nx), order='F')
+                }
+                frames_list.append(frame_dict)
+                
+    return frames_list

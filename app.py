@@ -1,9 +1,15 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import zipfile
-import re
-import io
+from processing.data_digestion import digest_csv_archive
+from processing.A_vector_field_heatmap_calc import precompute_time_series_heatmaps
+from processing.B_vorticity_field_over_time_calc import precompute_vorticity_maps
+from processing.C_velocity_vector_pdf_calc import precompute_velocity_pdfs
+from processing.D_directional_pdf_calc import compute_directional_pdf
+from processing.E_peak_velocity_over_time_calc import compute_peak_velocity_series
+from processing.F_sliced_velocity_over_time_calc import precompute_sliced_velocity
+from processing.G_puff_characteristics_boundary_radius_and_trajectory_calc import compute_puff_kinematics
+from processing.H_leading_edge_position_and_velocity_calc import compute_leading_edge_data
+from processing.I_spread_angle_calc import compute_spread_angle
+from processing.J_peak_puff_velocity_over_time_calc import compute_peak_puff_velocity_series
 
 st.set_page_config(
     page_title="Cough PIV Post-Processing Dashboard",
@@ -24,11 +30,32 @@ if "frames_data" not in st.session_state:
 if "loaded_folder_name" not in st.session_state:
     st.session_state.loaded_folder_name = ""
 
+# Precomputed Pipeline Cache
+if "heatmap_results" not in st.session_state:
+    st.session_state.heatmap_results = None
+if "vorticity_results" not in st.session_state:
+    st.session_state.vorticity_results = None
+if "velocity_pdf_results" not in st.session_state:
+    st.session_state.velocity_pdf_results = None
+if "directional_pdf_results" not in st.session_state:
+    st.session_state.directional_pdf_results = None
+if "peak_velocity_series_results" not in st.session_state:
+    st.session_state.peak_velocity_series_results = None
+if "sliced_velocity_results" not in st.session_state:
+    st.session_state.sliced_velocity_results = None
+if "puff_kinematics_results" not in st.session_state:
+    st.session_state.puff_kinematics_results = None
+if "leading_edge_results" not in st.session_state:
+    st.session_state.leading_edge_results = None
+if "spread_angle_results" not in st.session_state:
+    st.session_state.spread_angle_results = None
+if "peak_puff_velocity_results" not in st.session_state:
+    st.session_state.peak_puff_velocity_results = None
+
 st.title("Cough PIV Post-Processing Dashboard")
 st.subheader("Data Input and Configuration")
 
 col1, col2 = st.columns(2)
-
 with col1:
     st.markdown("### Experimental Parameters")
     st.session_state.start_frame = st.number_input(
@@ -67,73 +94,100 @@ uploaded_zip = st.file_uploader(
     type=["zip"]
 )
 
-def extract_file_number(filename):
-    match = re.search(r'\d+', filename)
-    return int(match.group()) if match else 0
-
 if uploaded_zip is not None:
     if st.button("Process Compressed Archive"):
-        frames_list = []
-        with zipfile.ZipFile(uploaded_zip) as z:
-            all_files = [f for f in z.namelist() if f.endswith('.csv') and not f.startswith('__MACOSX')]
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        def update_ui_progress(current, total, file_name):
+            progress_bar.progress((current + 1) / total)
+            status_text.text(f"Extracting frame {current+1} of {total} ({file_name})...")
+
+        try:
+            # Data Ingestion
+            processed_frames = digest_csv_archive(uploaded_zip, progress_callback=update_ui_progress)
+            st.session_state.frames_data = processed_frames
+            st.session_state.loaded_folder_name = uploaded_zip.name
             
-            import os
-            all_files = sorted(all_files, key=lambda x: [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', os.path.basename(x))])
+            # Step A
+            status_text.text("Step A")
+            st.session_state.heatmap_results = precompute_time_series_heatmaps(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+            )
             
-            num_files = len(all_files)
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            try:
-                for i, filename in enumerate(all_files):
-                    status_text.text(f"Extracting frame {i+1} of {num_files} ({os.path.basename(filename)})...")
-                    with z.open(filename) as f:
-                        df = pd.read_csv(f, sep=';')
-                        X = df.iloc[:, 0].to_numpy()
-                        Y = df.iloc[:, 1].to_numpy()
-                        U = df.iloc[:, 2].to_numpy()
-                        V = df.iloc[:, 3].to_numpy()
-                        Vmag = df.iloc[:, 4].to_numpy()
-                        vort = df.iloc[:, 5].to_numpy()
-                        
-                        xu = np.unique(X)
-                        yu = np.unique(Y)
-                        nx = len(xu)
-                        ny = len(yu)
-                        expected = nx * ny
-                        
-                        if len(X) > expected:
-                            X = X[:expected]
-                            Y = Y[:expected]
-                            U = U[:expected]
-                            V = V[:expected]
-                            Vmag = Vmag[:expected]
-                            vort = vort[:expected]
-                        
-                        frame_dict = {
-                            "X": X.reshape((ny, nx), order='F'),
-                            "Y": Y.reshape((ny, nx), order='F'),
-                            "U": U.reshape((ny, nx), order='F'),
-                            "V": V.reshape((ny, nx), order='F'),
-                            "Vmag": Vmag.reshape((ny, nx), order='F'),
-                            "vort": vort.reshape((ny, nx), order='F')
-                        }
-                        frames_list.append(frame_dict)
-                        progress_bar.progress((i + 1) / num_files)
-                
-                st.session_state.frames_data = frames_list
-                st.session_state.loaded_folder_name = uploaded_zip.name
-                status_text.empty()
-                st.success(f"Successfully processed {num_files} frames from archive.")
-            except Exception as e:
-                st.error(f"Error parsing zip file: {e}")
+            # Step B
+            status_text.text("Step B")
+            st.session_state.vorticity_results = precompute_vorticity_maps(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+            )
+            
+            # Step C
+            status_text.text("Step C")
+            st.session_state.velocity_pdf_results = precompute_velocity_pdfs(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x, st.session_state.mouth_y
+            )
+            
+            # Step D
+            status_text.text("Step D")
+            st.session_state.directional_pdf_results = compute_directional_pdf(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate
+            )
+            
+            # Step E
+            status_text.text("Step E")
+            st.session_state.peak_velocity_series_results = compute_peak_velocity_series(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate
+            )
+            
+            # Step F
+            status_text.text("Step F")
+            st.session_state.sliced_velocity_results = precompute_sliced_velocity(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+            )
+            
+            # Step G
+            status_text.text("Step G")
+            st.session_state.puff_kinematics_results = compute_puff_kinematics(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x, st.session_state.mouth_y
+            )
+            
+            # Step H
+            status_text.text("Step H")
+            st.session_state.leading_edge_results = compute_leading_edge_data(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+            )
+            
+            # Step I
+            status_text.text("Step I")
+            st.session_state.spread_angle_results = compute_spread_angle(
+                processed_frames, st.session_state.mouth_x, st.session_state.mouth_y
+            )
+            
+            # Step J
+            status_text.text("Step J")
+            st.session_state.peak_puff_velocity_results = compute_peak_puff_velocity_series(
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+            )
+            
+            status_text.empty()
+            progress_bar.empty()
+            st.success("All pipelines cached successfully!")
+            
+        except Exception as e:
+            st.error(f"Error executing pipeline modules: {e}")
 
 st.markdown("---")
 st.subheader("Current Session Configuration Status")
-
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric(label="Loaded Data Status", value=st.session_state.loaded_folder_name if st.session_state.loaded_folder_name else "No Data Loaded")
+    st.metric(
+        label="Loaded Data Status", 
+        value=st.session_state.loaded_folder_name if st.session_state.loaded_folder_name else "No Data Loaded"
+    )
 with col2:
     st.metric(label="Start Frame Index", value=st.session_state.start_frame)
 with col3:
-    st.metric(label="Mouth Target (X, Y)", value=f"({st.session_state.mouth_x}, {st.session_state.mouth_y}) mm")
+    st.metric(
+        label="Mouth Target (X, Y)", 
+        value=f"({st.session_state.mouth_x}, {st.session_state.mouth_y}) mm"
+    )
