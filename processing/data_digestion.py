@@ -5,11 +5,11 @@ import io
 import numpy as np
 import pandas as pd
 
-def digest_csv_archive(uploaded_zip, progress_callback=None):
+def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
     """
     Data Digestion Pipeline
-    Handles the parsing, naming validation, and Fortran-order grid alignment 
-    of physical spatial coordinates and velocity vector fields from DaVis 11 CSV files.
+    Handles parsing, naming validation, low-velocity thresholding, and Fortran-order 
+    grid alignment of physical spatial coordinates and velocity vector fields.
     """
     frames_list = []
     
@@ -51,6 +51,17 @@ def digest_csv_archive(uploaded_zip, progress_callback=None):
                     Vmag = Vmag[:expected_grid_size]
                     vort = vort[:expected_grid_size]
                 
+                # --- Velocity Thresholding ---
+                # Identify points below threshold
+                low_speed_mask = Vmag < min_velocity
+                
+                # Mask velocities and vorticity to NaN so grid dimensions stay intact
+                U = np.where(low_speed_mask, np.nan, U)
+                V = np.where(low_speed_mask, np.nan, V)
+                Vmag = np.where(low_speed_mask, np.nan, Vmag)
+                vort = np.where(low_speed_mask, np.nan, vort)
+                # ------------------------------
+
                 # Reshaping matrices requires Fortran order to preserve spatial orientation
                 frame_dict = {
                     "X": X.reshape((ny, nx), order='F'),
