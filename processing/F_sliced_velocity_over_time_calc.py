@@ -28,7 +28,7 @@ def precompute_sliced_velocity(frames_list, start_frame, frame_rate, mouth_x):
             if vals.size > 0:
                 storage[float(d)][f_idx] = np.nanmean(vals)
             else:
-                storage[float(d)][f_idx] = 0.0
+                storage[float(d)][f_idx] = np.nan
                 
     return {
         "time_base": time_base,

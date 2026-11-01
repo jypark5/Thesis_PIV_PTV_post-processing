@@ -34,7 +34,7 @@ def compute_leading_edge_data(frames_list, start_frame, frame_rate, mouth_x):
         V = f_data["Vmag"].ravel()
         
         points = np.vstack((Xs, Y)).T
-        Vi = griddata(points, V, (Xi, Yi), method='cubic')
+        Vi = griddata(points, V, (Xi, Yi), method='linear')
         Vi = np.nan_to_num(Vi, nan=0.0)
         
         mask = Vi > V_thr
@@ -50,7 +50,7 @@ def compute_leading_edge_data(frames_list, start_frame, frame_rate, mouth_x):
         
         x_vals = Xi[puff_mask]
         if x_vals.size > 0:
-            xLead_mm_raw[idx] = np.percentile(x_vals, 95)
+            xLead_mm_raw[idx] = np.percentile(x_vals, 95, method='hazen')
             
     return {
         "time_base": time_base,

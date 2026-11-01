@@ -105,7 +105,7 @@ if uploaded_zip is not None:
 
         try:
             # Data Ingestion
-            processed_frames = digest_csv_archive(uploaded_zip, progress_callback=update_ui_progress)
+            processed_frames = digest_csv_archive(uploaded_zip, progress_callback=update_ui_progress, min_velocity=0)
             st.session_state.frames_data = processed_frames
             st.session_state.loaded_folder_name = uploaded_zip.name
             

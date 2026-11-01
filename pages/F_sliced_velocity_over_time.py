@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-from scipy.ndimage import uniform_filter1d
+import pandas as pd
 from graphing.F_sliced_velocity_over_time_graph import build_sliced_velocity_trace_plot
 
 st.set_page_config(
@@ -47,7 +47,7 @@ else:
             traces.append(sliced_data[r][indices])
             
         traces = np.array(traces)
-        traces_smooth = uniform_filter1d(traces, size=smooth_window, axis=1, mode='nearest')
+        traces_smooth = pd.DataFrame(traces.T).rolling(window=smooth_window, center=True, min_periods=1).mean().to_numpy().T
         
         fig = build_sliced_velocity_trace_plot(time_ds, traces_smooth, valid_distances)
         st.plotly_chart(fig, use_container_width=True)

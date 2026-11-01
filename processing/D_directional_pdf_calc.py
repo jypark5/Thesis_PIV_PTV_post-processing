@@ -36,7 +36,7 @@ def compute_directional_pdf(frames_list, start_frame, frame_rate):
             V = f_data["V"].ravel()
 
             mag = np.sqrt(U**2 + V**2)
-            pct_40 = np.percentile(mag, 40)
+            pct_40 = np.nanpercentile(mag, 40, method='hazen')
             good = mag > pct_40
 
             U_good = U[good]

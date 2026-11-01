@@ -41,15 +41,16 @@ def precompute_vorticity_maps(frames_list, start_frame, frame_rate, mouth_x):
         points = np.vstack((x, y)).T
         Wi = griddata(points, w, (Xi, Yi), method='linear')
         Wi_filled = np.nan_to_num(Wi, nan=0.0)
-        W_smooth = gaussian_filter(Wi_filled, sigma=2, mode='nearest')
-        
+        W_smooth = gaussian_filter(Wi_filled, sigma=2, truncate=2.5, mode='nearest')
+
         snapshots[t] = {
             "xi": xi,
             "yi": yi,
-            "W_smooth": W_smooth
+            "W_smooth": W_smooth,
+            "abs_w": np.abs(w)
         }
-        
-    max_abs = float(np.percentile(np.abs(all_w), 98)) if all_w else 5.0
+
+    max_abs = float(np.percentile(np.abs(all_w), 98, method='hazen')) if all_w else 5.0
     
     return {
         "max_abs": max_abs,

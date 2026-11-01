@@ -40,7 +40,7 @@ def compute_peak_puff_velocity_series(frames_list, start_frame, frame_rate, mout
         Vi = griddata(points, V, (Xi, Yi), method='linear')
         Vi = np.nan_to_num(Vi, nan=0.0)
         
-        Vi_s = gaussian_filter(Vi, sigma=2)
+        Vi_s = gaussian_filter(Vi, sigma=2, truncate=2, mode='nearest')
         thresh = Vth * np.max(Vi_s)
         
         mask = Vi_s > thresh

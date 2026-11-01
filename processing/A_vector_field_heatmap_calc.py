@@ -41,7 +41,7 @@ def precompute_time_series_heatmaps(frames_list, start_frame, frame_rate, mouth_
             "Vi": Vi
         })
         
-    pct_98 = float(np.percentile(all_v, 98))
+    pct_98 = float(np.nanpercentile(all_v, 98, method='hazen'))
     
     return {
         "bounds_valid": True,

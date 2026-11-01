@@ -1,4 +1,5 @@
 import streamlit as st
+import numpy as np
 from graphing.B_vorticity_field_over_time_graph import build_vorticity_time_series_grid
 
 st.set_page_config(
@@ -26,12 +27,16 @@ else:
         st.error("Please enter a valid list of numbers separated by commas.")
         t_samples = [0.1, 0.2, 0.3]
         
+    # Colour limit follows only the selected times
+    selected_abs_w = [res["snapshots"][t]["abs_w"] for t in t_samples if t in res["snapshots"]]
+    max_abs = float(np.percentile(np.concatenate(selected_abs_w), 98, method='hazen')) if selected_abs_w else res["max_abs"]
+
     clim_val = st.sidebar.number_input(
-        "Symmetric Color Range Limit Max (1/s)", 
-        min_value=0.1, 
-        value=res["max_abs"], 
+        "Symmetric Color Range Limit Max (1/s)",
+        min_value=0.1,
+        value=max(max_abs, 0.1),
         step=50.0,
-        help=f"98th percentile of absolute value is {res['max_abs']:.2f} 1/s"
+        help=f"98th percentile of absolute value is {max_abs:.2f} 1/s"
     )
     
     fig = build_vorticity_time_series_grid(res, clim_val, t_samples)

@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from scipy.interpolate import griddata
-from scipy.ndimage import label, binary_closing, binary_fill_holes
+from scipy.ndimage import label, binary_dilation, binary_erosion, binary_fill_holes
 from graphing.G_puff_characteristics_boundary_radius_and_trajectory_graph import (
     build_puff_boundary_contour, 
     build_puff_kinematics_charts, 
@@ -44,6 +44,7 @@ else:
     radius_mm = res["radius_mm"][:n_cutoff]
     background_noise = res["background_noise"][:n_cutoff]
     background_std = res["background_std"][:n_cutoff]
+    mask_area = res["mask_area"][:n_cutoff]
     xi, yi, Xi, Yi = res["xi"], res["yi"], res["Xi"], res["Yi"]
 
     st.subheader("Interactive Single Frame Boundary Visualization")
@@ -69,7 +70,7 @@ else:
     if num_feats_p > 0:
         f_sizes_p = np.bincount(labeled_mask_p.ravel())
         mask_p[f_sizes_p[labeled_mask_p] < 40] = False
-    mask_p = binary_closing(mask_p, structure=res["disk_element"])
+    mask_p = binary_erosion(binary_dilation(mask_p, structure=res["disk_element"]), structure=res["disk_element"], border_value=1)
     mask_p = binary_fill_holes(mask_p)
 
     fig_heat = build_puff_boundary_contour(xi, yi, Vi_p, mask_p, frame_plot)
@@ -79,7 +80,10 @@ else:
     st.subheader("Dynamic Kinematics & Tracking Analysis Profiles")
 
     # Prune elements failing tracking density threshold filters
-    valid_mask = (~np.isnan(center_x)) & (radius_mm >= (min_area * (xi[1]-xi[0]) / 10.0))
+    area_ok = mask_area >= min_area
+    valid_mask = (~np.isnan(center_x)) & area_ok
+    background_noise = np.where(area_ok, background_noise, np.nan)
+    background_std = np.where(area_ok, background_std, np.nan)
     t_val = time_vec[valid_mask]
     tx_val = traj_x[valid_mask]
     tr_val = traj_r[valid_mask]
@@ -126,7 +130,7 @@ else:
     if np.any(valid_b):
         st.text(f"Mean background |V|     = {np.nanmean(background_noise):.4f} m/s")
         st.text(f"Median background |V|   = {np.nanmedian(background_noise):.4f} m/s")
-        st.text(f"Std dev of noise        = {np.nanstd(background_noise):.4f} m/s")
+        st.text(f"Std dev of noise        = {np.nanstd(background_noise, ddof=1):.4f} m/s")
         st.text(f"Max background |V|      = {np.nanmax(background_noise):.4f} m/s")
     else:
         st.text("Mean background |V|     = 0.0000 m/s\nMedian background |V|   = 0.0000 m/s\nStd dev of noise        = 0.0000 m/s\nMax background |V|      = 0.0000 m/s")

@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.interpolate import griddata
 from scipy.ndimage import (
-    label, binary_closing, binary_fill_holes, 
+    label, binary_dilation, binary_erosion, binary_fill_holes,
     distance_transform_edt
 )
 
@@ -40,6 +40,7 @@ def compute_puff_kinematics(frames_list, start_frame, frame_rate, mouth_x_mm, mo
     radius_mm = np.full(n_use, np.nan)
     background_noise = np.full(n_use, np.nan)
     background_std = np.full(n_use, np.nan)
+    mask_area = np.zeros(n_use)
 
     disk_element = np.array([
         [0, 0, 1, 1, 1, 0, 0],
@@ -60,7 +61,7 @@ def compute_puff_kinematics(frames_list, start_frame, frame_rate, mouth_x_mm, mo
         V = f_data["Vmag"].ravel()
 
         points = np.vstack((X, Y)).T
-        Vi = griddata(points, V, (Xi, Yi), method='cubic')
+        Vi = griddata(points, V, (Xi, Yi), method='linear')
         
         v_max_local = np.nanmax(Vi) if not np.all(np.isnan(Vi)) else 0.0
         v_thr = 0.40 * v_max_local
@@ -74,8 +75,10 @@ def compute_puff_kinematics(frames_list, start_frame, frame_rate, mouth_x_mm, mo
             small_objects = feature_sizes < 40
             mask[small_objects[labeled_mask]] = False
 
-        mask = binary_closing(mask, structure=disk_element)
+        # border_value=1 keeps the frame edge from eroding the mask, matching MATLAB imclose
+        mask = binary_erosion(binary_dilation(mask, structure=disk_element), structure=disk_element, border_value=1)
         mask = binary_fill_holes(mask)
+        mask_area[ii] = np.count_nonzero(mask)
 
         labeled_mask, num_features = label(mask, structure=connectivity_8)
         if num_features == 0:
@@ -93,7 +96,7 @@ def compute_puff_kinematics(frames_list, start_frame, frame_rate, mouth_x_mm, mo
         
         if background_vals.size > 0:
             background_noise[ii] = np.mean(background_vals)
-            background_std[ii] = np.std(background_vals)
+            background_std[ii] = np.std(background_vals, ddof=1)
 
         D = distance_transform_edt(puff_mask)
         idx_max = np.argmax(D)
@@ -120,6 +123,7 @@ def compute_puff_kinematics(frames_list, start_frame, frame_rate, mouth_x_mm, mo
         "radius_mm": radius_mm,
         "background_noise": background_noise,
         "background_std": background_std,
+        "mask_area": mask_area,
         "xi": xi,
         "yi": yi,
         "Xi": Xi,
