@@ -62,15 +62,19 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                 vort = np.where(low_speed_mask, np.nan, vort)
                 # ------------------------------
 
-                # Reshaping matrices requires Fortran order to preserve spatial orientation
-                frame_dict = {
-                    "X": X.reshape((ny, nx), order='F'),
-                    "Y": Y.reshape((ny, nx), order='F'),
-                    "U": U.reshape((ny, nx), order='F'),
-                    "V": V.reshape((ny, nx), order='F'),
-                    "Vmag": Vmag.reshape((ny, nx), order='F'),
-                    "vort": vort.reshape((ny, nx), order='F')
-                }
+                if len(X) == expected_grid_size:
+                    # Reshaping matrices requires Fortran order to preserve spatial orientation
+                    frame_dict = {
+                        "X": X.reshape((ny, nx), order='F'),
+                        "Y": Y.reshape((ny, nx), order='F'),
+                        "U": U.reshape((ny, nx), order='F'),
+                        "V": V.reshape((ny, nx), order='F'),
+                        "Vmag": Vmag.reshape((ny, nx), order='F'),
+                        "vort": vort.reshape((ny, nx), order='F')
+                    }
+                else:
+                    # Scattered vectors (e.g. PTV) are kept as 1-D arrays
+                    frame_dict = {"X": X, "Y": Y, "U": U, "V": V, "Vmag": Vmag, "vort": vort}
                 frames_list.append(frame_dict)
                 
     return frames_list
