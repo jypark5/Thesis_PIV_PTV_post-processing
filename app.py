@@ -20,11 +20,11 @@ st.set_page_config(
 if "start_frame" not in st.session_state:
     st.session_state.start_frame = 1
 if "mouth_x" not in st.session_state:
-    st.session_state.mouth_x = 20
+    st.session_state.mouth_x = -291
 if "mouth_y" not in st.session_state:
-    st.session_state.mouth_y = 70
+    st.session_state.mouth_y = -151
 if "frame_rate" not in st.session_state:
-    st.session_state.frame_rate = 2000
+    st.session_state.frame_rate = 1496
 if "frames_data" not in st.session_state:
     st.session_state.frames_data = None
 if "loaded_folder_name" not in st.session_state:
