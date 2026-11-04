@@ -4,6 +4,7 @@ import zipfile
 import io
 import numpy as np
 import pandas as pd
+from processing.scattered import remove_outliers
 
 def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
     """
@@ -50,7 +51,13 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                     V = V[:expected_grid_size]
                     Vmag = Vmag[:expected_grid_size]
                     vort = vort[:expected_grid_size]
-                
+
+                scattered = len(X) != expected_grid_size
+                if scattered:
+                    # Remove spurious particles before any thresholding
+                    keep = remove_outliers(X, Y, U, V)
+                    X, Y, U, V, Vmag, vort = (a[keep] for a in (X, Y, U, V, Vmag, vort))
+
                 # --- Velocity Thresholding ---
                 # Identify points below threshold
                 low_speed_mask = Vmag < min_velocity
@@ -62,7 +69,7 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                 vort = np.where(low_speed_mask, np.nan, vort)
                 # ------------------------------
 
-                if len(X) == expected_grid_size:
+                if not scattered:
                     # Reshaping matrices requires Fortran order to preserve spatial orientation
                     frame_dict = {
                         "X": X.reshape((ny, nx), order='F'),
