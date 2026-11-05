@@ -21,14 +21,14 @@ else:
     st.sidebar.markdown("### Slice Configurations")
     r_list_str = st.sidebar.text_input(
         "Downstream distances from mouth (mm, comma-separated)", 
-        value="100, 200, 300"
+        value="200, 300, 400"
     )
     
     try:
         r_list = [float(r.strip()) for r in r_list_str.split(",") if r.strip()]
     except ValueError:
         st.error("Please enter a valid list of distances separated by commas.")
-        r_list = [100.0, 200.0, 300.0]
+        r_list = [200.0, 300.0, 400.0]
 
     ds = st.sidebar.number_input("Frame Downsampling Factor", min_value=1, value=10, step=5)
     smooth_window = st.sidebar.number_input("Temporal Smoothing Window Size", min_value=1, value=7, step=2)

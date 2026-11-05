@@ -105,26 +105,30 @@ if uploaded_zip is not None:
 
         try:
             # Data Ingestion
-            processed_frames = digest_csv_archive(uploaded_zip, progress_callback=update_ui_progress, min_velocity=0)
+            # Coordinates are shifted so the mouth is at (0, 0); every step below uses that origin
+            processed_frames = digest_csv_archive(
+                uploaded_zip, progress_callback=update_ui_progress, min_velocity=0,
+                mouth_x=st.session_state.mouth_x, mouth_y=st.session_state.mouth_y
+            )
             st.session_state.frames_data = processed_frames
             st.session_state.loaded_folder_name = uploaded_zip.name
             
             # Step A
             status_text.text("Step A")
             st.session_state.heatmap_results = precompute_time_series_heatmaps(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0
             )
             
             # Step B
             status_text.text("Step B")
             st.session_state.vorticity_results = precompute_vorticity_maps(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0
             )
             
             # Step C
             status_text.text("Step C")
             st.session_state.velocity_pdf_results = precompute_velocity_pdfs(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x, st.session_state.mouth_y
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0, 0.0
             )
             
             # Step D
@@ -142,31 +146,31 @@ if uploaded_zip is not None:
             # Step F
             status_text.text("Step F")
             st.session_state.sliced_velocity_results = precompute_sliced_velocity(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0
             )
             
             # Step G
             status_text.text("Step G")
             st.session_state.puff_kinematics_results = compute_puff_kinematics(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x, st.session_state.mouth_y
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0, 0.0
             )
             
             # Step H
             status_text.text("Step H")
             st.session_state.leading_edge_results = compute_leading_edge_data(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0
             )
             
             # Step I
             status_text.text("Step I")
             st.session_state.spread_angle_results = compute_spread_angle(
-                processed_frames, st.session_state.mouth_x, st.session_state.mouth_y
+                processed_frames, 0.0, 0.0
             )
             
             # Step J
             status_text.text("Step J")
             st.session_state.peak_puff_velocity_results = compute_peak_puff_velocity_series(
-                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, st.session_state.mouth_x
+                processed_frames, st.session_state.start_frame, st.session_state.frame_rate, 0.0
             )
             
             status_text.empty()
