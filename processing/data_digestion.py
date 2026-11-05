@@ -6,11 +6,12 @@ import numpy as np
 import pandas as pd
 from processing.scattered import remove_outliers
 
-def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
+def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5, mouth_x=0.0, mouth_y=0.0):
     """
     Data Digestion Pipeline
-    Handles parsing, naming validation, low-velocity thresholding, and Fortran-order 
+    Handles parsing, naming validation, low-velocity thresholding, and Fortran-order
     grid alignment of physical spatial coordinates and velocity vector fields.
+    Coordinates are shifted so the mouth is at (0, 0).
     """
     frames_list = []
     
@@ -31,8 +32,8 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                 df = pd.read_csv(f, sep=';')
                 df.columns = df.columns.str.strip()
                 
-                X = df['x [mm]'].to_numpy()
-                Y = df['y [mm]'].to_numpy()
+                X = df['x [mm]'].to_numpy() - mouth_x
+                Y = df['y [mm]'].to_numpy() - mouth_y
                 U = df['Velocity u [m/s]'].to_numpy()
                 V = df['Velocity v [m/s]'].to_numpy()
                 Vmag = df['Velocity |V| [m/s]'].to_numpy()

@@ -13,7 +13,6 @@ if "spread_angle_results" not in st.session_state or st.session_state.spread_ang
     st.warning("Please upload and process your data inside the Main Page first.")
 else:
     res = st.session_state.spread_angle_results
-    mouth_y_mm = st.session_state.mouth_y
     
     if not res["bounds_valid"]:
         st.error("Unable to resolve contiguous vector shapes or boundaries. Verify data thresholds.")
@@ -26,5 +25,5 @@ else:
         with col3:
             st.metric(label="Lower Orientation Angle", value=f"{res['angleL']:.2f}°")
             
-        fig = build_puff_spread_angle_plot(res, mouth_y_mm)
+        fig = build_puff_spread_angle_plot(res, 0.0)
         st.plotly_chart(fig, use_container_width=False)

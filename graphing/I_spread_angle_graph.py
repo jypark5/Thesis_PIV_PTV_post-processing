@@ -91,7 +91,7 @@ def build_puff_spread_angle_plot(results, mouth_y):
             title=dict(text="y (mm)", font=dict(family="Times New Roman", size=14, color="black")),
             tickfont=dict(family="Times New Roman", size=12, color="black"),
             gridcolor="lightgrey", showline=True, linecolor='black', mirror=True,
-            range=[0, 200]
+            range=[np.min(yi), np.max(yi)]
         ),
         legend=dict(
             x=0.02,               # 2% from the left

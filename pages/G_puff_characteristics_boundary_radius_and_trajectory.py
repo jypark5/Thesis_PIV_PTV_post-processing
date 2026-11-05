@@ -23,7 +23,6 @@ if "puff_kinematics_results" not in st.session_state or st.session_state.puff_ki
 else:
     frames = st.session_state.frames_data
     start_frame = st.session_state.start_frame
-    mouth_x_mm = st.session_state.mouth_x
     frame_rate = st.session_state.frame_rate
     dt = 1.0 / frame_rate
     
@@ -48,15 +47,20 @@ else:
     xi, yi, Xi, Yi = res["xi"], res["yi"], res["Xi"], res["Yi"]
 
     st.subheader("Interactive Single Frame Boundary Visualization")
+    # Default to the frame of peak velocity (graph E), kept within the analysis window
+    frame_min = int(start_frame)
+    frame_max = int(start_frame + n_cutoff - 1)
+    peak_res = st.session_state.get("peak_velocity_series_results")
+    frame_default = frame_min if peak_res is None else min(max(int(peak_res["global_peak_frame"]), frame_min), frame_max)
     frame_plot = st.number_input(
         "Select Profile Frame Index", 
-        min_value=int(start_frame), 
-        max_value=int(start_frame + n_cutoff - 1), 
-        value=int(start_frame)
+        min_value=frame_min, 
+        max_value=frame_max, 
+        value=frame_default
     )
 
     f_plot_data = frames[frame_plot - 1]
-    X_p = f_plot_data["X"].ravel() - mouth_x_mm
+    X_p = f_plot_data["X"].ravel()
     Y_p = f_plot_data["Y"].ravel()
     V_p = f_plot_data["Vmag"].ravel()
 
