@@ -67,17 +67,19 @@ def compute_spread_angle(frames_list, mouth_x, mouth_y):
     xLbin = xLbin[iLs]
     yLenv = yLenv[iLs]
 
-    fitMax = 120.0
-    uMask = (xUbin > 0) & (xUbin < fitMax)
-    lMask = (xLbin > 0) & (xLbin < fitMax)
+    # Fit over the first 120 mm of the puff, measured from its rearmost boundary point
+    fitLength = 120.0
+    fitStart = np.min(x_rel[down])
+    fitEnd = fitStart + fitLength
+    uMask = (xUbin >= fitStart) & (xUbin <= fitEnd)
+    lMask = (xLbin >= fitStart) & (xLbin <= fitEnd)
 
     if np.sum(uMask) < 2 or np.sum(lMask) < 2:
         return {"bounds_valid": False}
 
-    pU = np.polyfit(xUbin[uMask], yUenv[uMask], 1)
-    pL = np.polyfit(xLbin[lMask], yLenv[lMask], 1)
-
-    mU, mL = pU[0], pL[0]
+    # Least-squares lines constrained to pass through the mouth: y - mouth_y = m * x
+    mU = np.sum(xUbin[uMask] * (yUenv[uMask] - mouth_y)) / np.sum(xUbin[uMask] ** 2)
+    mL = np.sum(xLbin[lMask] * (yLenv[lMask] - mouth_y)) / np.sum(xLbin[lMask] ** 2)
 
     angleU = float(np.degrees(np.arctan(mU)))
     angleL = float(np.degrees(np.arctan(np.abs(mL))))
