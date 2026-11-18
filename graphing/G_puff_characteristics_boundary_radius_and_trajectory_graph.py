@@ -106,15 +106,15 @@ def build_puff_morphology_scaling_chart(s_sorted, r_sorted, r_sorted_smooth):
         )
     )
     fig_morph.update_layout(
-        title=dict(text="Puff Half-Width vs Axial Distance", font=dict(family="Times New Roman", size=16, color="black")),
+        title=dict(text="Puff Half-Width vs Streamwise Position", font=dict(family="Times New Roman", size=16, color="black")),
         xaxis=dict(
-            title=dict(text="s (cm) – Axial puff trajectory", font=dict(family="Times New Roman", size=14, color="black")),
+            title=dict(text="s_x (cm) – Streamwise position of cloud centre", font=dict(family="Times New Roman", size=14, color="black")),
             tickfont=dict(family="Times New Roman", size=12, color="black"),
-            range=[0, np.max(s_sorted)*1.05] if s_sorted.size > 0 else None,
+            range=[10, 50],
             gridcolor="lightgrey", showline=True, linecolor="black", mirror=True
         ),
         yaxis=dict(
-            title=dict(text="r (cm) – Puff half-width", font=dict(family="Times New Roman", size=14, color="black")),
+            title=dict(text="r (cm) – Cloud half-width", font=dict(family="Times New Roman", size=14, color="black")),
             tickfont=dict(family="Times New Roman", size=12, color="black"),
             range=[0, np.max(r_sorted)*1.2] if r_sorted.size > 0 else None,
             gridcolor="lightgrey", showline=True, linecolor="black", mirror=True

@@ -102,10 +102,10 @@ else:
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        fig1 = build_puff_kinematics_charts(t_val, tx_val, tx_smooth, tr_val, tr_smooth, r_val, r_smooth, "Puff trajectory along x axis", "s_x (m)")
+        fig1 = build_puff_kinematics_charts(t_val, tx_val, tx_smooth, tr_val, tr_smooth, r_val, r_smooth, "Streamwise position of cloud centre", "s_x (m)")
         st.plotly_chart(fig1, use_container_width=True)
     with col2:
-        fig2 = build_puff_kinematics_charts(t_val, tr_val, tr_smooth, tx_val, tx_smooth, r_val, r_smooth, "Radial puff trajectory spatial tracking", "s (m)")
+        fig2 = build_puff_kinematics_charts(t_val, tr_val, tr_smooth, tx_val, tx_smooth, r_val, r_smooth, "Straight-line distance of puff centre from mouth", "s (m)")
         st.plotly_chart(fig2, use_container_width=True)
     with col3:
         fig3 = build_puff_kinematics_charts(t_val, r_val, r_smooth, tx_val, tx_smooth, tr_val, tr_smooth, "Puff expansion radius profile vs time", "r (m)")
@@ -140,10 +140,15 @@ else:
         st.text("Mean background |V|     = 0.0000 m/s\nMedian background |V|   = 0.0000 m/s\nStd dev of noise        = 0.0000 m/s\nMax background |V|      = 0.0000 m/s")
 
     st.markdown("---")
-    st.subheader("Morphology Aspect Profile: Puff Half-Width vs Axial Distance")
+    st.subheader("Morphology Aspect Profile: Puff Half-Width vs Streamwise Position")
 
     s_vals = traj_x[valid_mask] / 10.0
     r_vals = radius_mm[valid_mask] / 10.0
+
+    # Only plot the puff while its centre is 10-50 cm downstream of the mouth
+    in_range = (s_vals >= 10.0) & (s_vals <= 50.0)
+    s_vals = s_vals[in_range]
+    r_vals = r_vals[in_range]
 
     sort_idx = np.argsort(s_vals)
     s_sorted = s_vals[sort_idx]
