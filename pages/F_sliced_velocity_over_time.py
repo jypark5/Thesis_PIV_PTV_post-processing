@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-from scipy.ndimage import uniform_filter1d
+import pandas as pd
 from graphing.F_sliced_velocity_over_time_graph import build_sliced_velocity_trace_plot
 
 st.set_page_config(
@@ -21,14 +21,14 @@ else:
     st.sidebar.markdown("### Slice Configurations")
     r_list_str = st.sidebar.text_input(
         "Downstream distances from mouth (mm, comma-separated)", 
-        value="100, 200, 300"
+        value="200, 300, 400"
     )
     
     try:
         r_list = [float(r.strip()) for r in r_list_str.split(",") if r.strip()]
     except ValueError:
         st.error("Please enter a valid list of distances separated by commas.")
-        r_list = [100.0, 200.0, 300.0]
+        r_list = [200.0, 300.0, 400.0]
 
     ds = st.sidebar.number_input("Frame Downsampling Factor", min_value=1, value=10, step=5)
     smooth_window = st.sidebar.number_input("Temporal Smoothing Window Size", min_value=1, value=7, step=2)
@@ -47,7 +47,7 @@ else:
             traces.append(sliced_data[r][indices])
             
         traces = np.array(traces)
-        traces_smooth = uniform_filter1d(traces, size=smooth_window, axis=1, mode='nearest')
+        traces_smooth = pd.DataFrame(traces.T).rolling(window=smooth_window, center=True, min_periods=1).mean().to_numpy().T
         
         fig = build_sliced_velocity_trace_plot(time_ds, traces_smooth, valid_distances)
         st.plotly_chart(fig, use_container_width=True)

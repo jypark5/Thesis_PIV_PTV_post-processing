@@ -27,8 +27,28 @@ def build_time_series_heatmap_grid(results, cmax):
             ),
             row=row, col=col
         )
-        
+
+    # Legend-only entry explaining the NaN (uncoloured) regions
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            marker=dict(symbol="square", size=14, color="white", line=dict(color="black", width=1)),
+            name="Uncoloured areas contain no measured vectors",
+            showlegend=True
+        ),
+        row=1, col=1
+    )
+
     fig.update_layout(
+        legend=dict(
+            orientation="h",
+            x=0.5,
+            xanchor="center",
+            y=-0.12,
+            yanchor="top"
+        ),
         coloraxis=dict(
             colorscale='Turbo',
             cmin=0,
@@ -47,7 +67,7 @@ def build_time_series_heatmap_grid(results, cmax):
         ),
         width=1200,
         height=700,
-        margin=dict(l=60, r=20, t=50, b=50)
+        margin=dict(l=60, r=20, t=50, b=90)
     )
     
     fig.update_yaxes(title_text="y [mm]", row=1, col=1)

@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from scipy.interpolate import griddata
-from scipy.ndimage import label, binary_closing, binary_fill_holes
+from scipy.ndimage import label, binary_dilation, binary_erosion, binary_fill_holes
 from graphing.G_puff_characteristics_boundary_radius_and_trajectory_graph import (
     build_puff_boundary_contour, 
     build_puff_kinematics_charts, 
@@ -23,7 +23,6 @@ if "puff_kinematics_results" not in st.session_state or st.session_state.puff_ki
 else:
     frames = st.session_state.frames_data
     start_frame = st.session_state.start_frame
-    mouth_x_mm = st.session_state.mouth_x
     frame_rate = st.session_state.frame_rate
     dt = 1.0 / frame_rate
     
@@ -44,18 +43,24 @@ else:
     radius_mm = res["radius_mm"][:n_cutoff]
     background_noise = res["background_noise"][:n_cutoff]
     background_std = res["background_std"][:n_cutoff]
+    mask_area = res["mask_area"][:n_cutoff]
     xi, yi, Xi, Yi = res["xi"], res["yi"], res["Xi"], res["Yi"]
 
     st.subheader("Interactive Single Frame Boundary Visualization")
+    # Default to the frame of peak velocity (graph E), kept within the analysis window
+    frame_min = int(start_frame)
+    frame_max = int(start_frame + n_cutoff - 1)
+    peak_res = st.session_state.get("peak_velocity_series_results")
+    frame_default = frame_min if peak_res is None else min(max(int(peak_res["global_peak_frame"]), frame_min), frame_max)
     frame_plot = st.number_input(
         "Select Profile Frame Index", 
-        min_value=int(start_frame), 
-        max_value=int(start_frame + n_cutoff - 1), 
-        value=int(start_frame)
+        min_value=frame_min, 
+        max_value=frame_max, 
+        value=frame_default
     )
 
     f_plot_data = frames[frame_plot - 1]
-    X_p = f_plot_data["X"].ravel() - mouth_x_mm
+    X_p = f_plot_data["X"].ravel()
     Y_p = f_plot_data["Y"].ravel()
     V_p = f_plot_data["Vmag"].ravel()
 
@@ -69,7 +74,7 @@ else:
     if num_feats_p > 0:
         f_sizes_p = np.bincount(labeled_mask_p.ravel())
         mask_p[f_sizes_p[labeled_mask_p] < 40] = False
-    mask_p = binary_closing(mask_p, structure=res["disk_element"])
+    mask_p = binary_erosion(binary_dilation(mask_p, structure=res["disk_element"]), structure=res["disk_element"], border_value=1)
     mask_p = binary_fill_holes(mask_p)
 
     fig_heat = build_puff_boundary_contour(xi, yi, Vi_p, mask_p, frame_plot)
@@ -79,7 +84,10 @@ else:
     st.subheader("Dynamic Kinematics & Tracking Analysis Profiles")
 
     # Prune elements failing tracking density threshold filters
-    valid_mask = (~np.isnan(center_x)) & (radius_mm >= (min_area * (xi[1]-xi[0]) / 10.0))
+    area_ok = mask_area >= min_area
+    valid_mask = (~np.isnan(center_x)) & area_ok
+    background_noise = np.where(area_ok, background_noise, np.nan)
+    background_std = np.where(area_ok, background_std, np.nan)
     t_val = time_vec[valid_mask]
     tx_val = traj_x[valid_mask]
     tr_val = traj_r[valid_mask]
@@ -94,10 +102,10 @@ else:
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        fig1 = build_puff_kinematics_charts(t_val, tx_val, tx_smooth, tr_val, tr_smooth, r_val, r_smooth, "Puff trajectory along x axis", "s_x (m)")
+        fig1 = build_puff_kinematics_charts(t_val, tx_val, tx_smooth, tr_val, tr_smooth, r_val, r_smooth, "Streamwise position of cloud centre", "s_x (m)")
         st.plotly_chart(fig1, use_container_width=True)
     with col2:
-        fig2 = build_puff_kinematics_charts(t_val, tr_val, tr_smooth, tx_val, tx_smooth, r_val, r_smooth, "Radial puff trajectory spatial tracking", "s (m)")
+        fig2 = build_puff_kinematics_charts(t_val, tr_val, tr_smooth, tx_val, tx_smooth, r_val, r_smooth, "Straight-line distance of puff centre from mouth", "s (m)")
         st.plotly_chart(fig2, use_container_width=True)
     with col3:
         fig3 = build_puff_kinematics_charts(t_val, r_val, r_smooth, tx_val, tx_smooth, tr_val, tr_smooth, "Puff expansion radius profile vs time", "r (m)")
@@ -126,16 +134,21 @@ else:
     if np.any(valid_b):
         st.text(f"Mean background |V|     = {np.nanmean(background_noise):.4f} m/s")
         st.text(f"Median background |V|   = {np.nanmedian(background_noise):.4f} m/s")
-        st.text(f"Std dev of noise        = {np.nanstd(background_noise):.4f} m/s")
+        st.text(f"Std dev of noise        = {np.nanstd(background_noise, ddof=1):.4f} m/s")
         st.text(f"Max background |V|      = {np.nanmax(background_noise):.4f} m/s")
     else:
         st.text("Mean background |V|     = 0.0000 m/s\nMedian background |V|   = 0.0000 m/s\nStd dev of noise        = 0.0000 m/s\nMax background |V|      = 0.0000 m/s")
 
     st.markdown("---")
-    st.subheader("Morphology Aspect Profile: Puff Half-Width vs Axial Distance")
+    st.subheader("Morphology Aspect Profile: Puff Half-Width vs Streamwise Position")
 
     s_vals = traj_x[valid_mask] / 10.0
     r_vals = radius_mm[valid_mask] / 10.0
+
+    # Only plot the puff while its centre is 10-50 cm downstream of the mouth
+    in_range = (s_vals >= 10.0) & (s_vals <= 50.0)
+    s_vals = s_vals[in_range]
+    r_vals = r_vals[in_range]
 
     sort_idx = np.argsort(s_vals)
     s_sorted = s_vals[sort_idx]

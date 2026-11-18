@@ -4,12 +4,14 @@ import zipfile
 import io
 import numpy as np
 import pandas as pd
+from processing.scattered import remove_outliers
 
-def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
+def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5, mouth_x=0.0, mouth_y=0.0):
     """
     Data Digestion Pipeline
-    Handles parsing, naming validation, low-velocity thresholding, and Fortran-order 
+    Handles parsing, naming validation, low-velocity thresholding, and Fortran-order
     grid alignment of physical spatial coordinates and velocity vector fields.
+    Coordinates are shifted so the mouth is at (0, 0).
     """
     frames_list = []
     
@@ -30,8 +32,8 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                 df = pd.read_csv(f, sep=';')
                 df.columns = df.columns.str.strip()
                 
-                X = df['x [mm]'].to_numpy()
-                Y = df['y [mm]'].to_numpy()
+                X = df['x [mm]'].to_numpy() - mouth_x
+                Y = df['y [mm]'].to_numpy() - mouth_y
                 U = df['Velocity u [m/s]'].to_numpy()
                 V = df['Velocity v [m/s]'].to_numpy()
                 Vmag = df['Velocity |V| [m/s]'].to_numpy()
@@ -50,7 +52,13 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                     V = V[:expected_grid_size]
                     Vmag = Vmag[:expected_grid_size]
                     vort = vort[:expected_grid_size]
-                
+
+                scattered = len(X) != expected_grid_size
+                if scattered:
+                    # Remove spurious particles before any thresholding
+                    keep = remove_outliers(X, Y, U, V)
+                    X, Y, U, V, Vmag, vort = (a[keep] for a in (X, Y, U, V, Vmag, vort))
+
                 # --- Velocity Thresholding ---
                 # Identify points below threshold
                 low_speed_mask = Vmag < min_velocity
@@ -62,15 +70,19 @@ def digest_csv_archive(uploaded_zip, progress_callback=None, min_velocity=0.5):
                 vort = np.where(low_speed_mask, np.nan, vort)
                 # ------------------------------
 
-                # Reshaping matrices requires Fortran order to preserve spatial orientation
-                frame_dict = {
-                    "X": X.reshape((ny, nx), order='F'),
-                    "Y": Y.reshape((ny, nx), order='F'),
-                    "U": U.reshape((ny, nx), order='F'),
-                    "V": V.reshape((ny, nx), order='F'),
-                    "Vmag": Vmag.reshape((ny, nx), order='F'),
-                    "vort": vort.reshape((ny, nx), order='F')
-                }
+                if not scattered:
+                    # Reshaping matrices requires Fortran order to preserve spatial orientation
+                    frame_dict = {
+                        "X": X.reshape((ny, nx), order='F'),
+                        "Y": Y.reshape((ny, nx), order='F'),
+                        "U": U.reshape((ny, nx), order='F'),
+                        "V": V.reshape((ny, nx), order='F'),
+                        "Vmag": Vmag.reshape((ny, nx), order='F'),
+                        "vort": vort.reshape((ny, nx), order='F')
+                    }
+                else:
+                    # Scattered vectors (e.g. PTV) are kept as 1-D arrays
+                    frame_dict = {"X": X, "Y": Y, "U": U, "V": V, "Vmag": Vmag, "vort": vort}
                 frames_list.append(frame_dict)
                 
     return frames_list

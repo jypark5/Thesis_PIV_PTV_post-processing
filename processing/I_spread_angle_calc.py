@@ -1,11 +1,10 @@
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.ndimage import gaussian_filter, label
-from skimage.measure import find_contours
+from scipy.ndimage import binary_erosion, gaussian_filter, label
 
 def compute_spread_angle(frames_list, mouth_x, mouth_y):
-    peak_velocities = [np.max(f["Vmag"]) for f in frames_list]
-    peak_frame_idx = int(np.argmax(peak_velocities))
+    peak_velocities = [np.nanmax(f["Vmag"]) for f in frames_list]
+    peak_frame_idx = int(np.nanargmax(peak_velocities))
     F = frames_list[peak_frame_idx]
     X, Y, V = F["X"], F["Y"], F["Vmag"]
 
@@ -16,14 +15,10 @@ def compute_spread_angle(frames_list, mouth_x, mouth_y):
     points = np.vstack((X.ravel(), Y.ravel())).T
     values = V.ravel()
 
-    Vi = griddata(points, values, (Xi, Yi), method='cubic')
-    nanMask = np.isnan(Vi)
-    if np.any(nanMask):
-        Vi_lin = griddata(points, values, (Xi, Yi), method='linear')
-        Vi[nanMask] = Vi_lin[nanMask]
+    Vi = griddata(points, values, (Xi, Yi), method='linear')
 
     Vi_zeroed = np.nan_to_num(Vi, nan=0.0)
-    Vi_s = gaussian_filter(Vi_zeroed, sigma=2)
+    Vi_s = gaussian_filter(Vi_zeroed, sigma=2, truncate=2, mode='nearest')
 
     thresh = 0.15 * np.max(Vi_s)
     mask = Vi_s > thresh
@@ -35,15 +30,8 @@ def compute_spread_angle(frames_list, mouth_x, mouth_y):
     sizes[0] = 0
     mask2 = (labeled == np.argmax(sizes))
 
-    contours = find_contours(mask2.astype(float), 0.5)
-    if not contours:
-        return {"bounds_valid": False}
-    bd = max(contours, key=len)
-
-    rows = np.round(bd[:, 0]).astype(int)
-    cols = np.round(bd[:, 1]).astype(int)
-    rows = np.clip(rows, 0, len(yi) - 1)
-    cols = np.clip(cols, 0, len(xi) - 1)
+    # Boundary pixels of the mask, including where it meets the frame edge
+    rows, cols = np.nonzero(mask2 & ~binary_erosion(mask2))
 
     x_b = xi[cols]
     y_b = yi[rows]
@@ -79,17 +67,19 @@ def compute_spread_angle(frames_list, mouth_x, mouth_y):
     xLbin = xLbin[iLs]
     yLenv = yLenv[iLs]
 
-    fitMax = 120.0
-    uMask = (xUbin > 0) & (xUbin < fitMax)
-    lMask = (xLbin > 0) & (xLbin < fitMax)
+    # Fit over the first 120 mm of the puff, measured from its rearmost boundary point
+    fitLength = 120.0
+    fitStart = np.min(x_rel[down])
+    fitEnd = fitStart + fitLength
+    uMask = (xUbin >= fitStart) & (xUbin <= fitEnd)
+    lMask = (xLbin >= fitStart) & (xLbin <= fitEnd)
 
     if np.sum(uMask) < 2 or np.sum(lMask) < 2:
         return {"bounds_valid": False}
 
-    pU = np.polyfit(xUbin[uMask], yUenv[uMask], 1)
-    pL = np.polyfit(xLbin[lMask], yLenv[lMask], 1)
-
-    mU, mL = pU[0], pL[0]
+    # Least-squares lines constrained to pass through the mouth: y - mouth_y = m * x
+    mU = np.sum(xUbin[uMask] * (yUenv[uMask] - mouth_y)) / np.sum(xUbin[uMask] ** 2)
+    mL = np.sum(xLbin[lMask] * (yLenv[lMask] - mouth_y)) / np.sum(xLbin[lMask] ** 2)
 
     angleU = float(np.degrees(np.arctan(mU)))
     angleL = float(np.degrees(np.arctan(np.abs(mL))))
